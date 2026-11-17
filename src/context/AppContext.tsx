@@ -282,24 +282,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSheetsSyncError(null);
     try {
       const remote = await pullFromSheets(sheetsSyncUrl);
-      const mergedTasks = remote && remote.tasks.length > 0 ? mergeTasks(tasks, remote.tasks) : tasks;
-      const mergedSections = remote && remote.sections && remote.sections.length > 0 ? remote.sections : sections;
-      const mergedLists = remote && remote.lists && remote.lists.length > 0 ? remote.lists : customLists;
-
-      setTasks(mergedTasks);
-      setSections(mergedSections);
-      setCustomLists(mergedLists);
-
-      const pushRes = await pushToSheets(sheetsSyncUrl, {
-        tasks: mergedTasks,
-        sections: mergedSections,
-        lists: mergedLists,
-      });
-
-      if (pushRes.success) {
+      if (remote) {
+        setTasks((prev) => mergeTasks(prev, remote.tasks));
+        if (remote.sections && remote.sections.length > 0) {
+          setSections(remote.sections);
+        }
+        if (remote.lists && remote.lists.length > 0) {
+          setCustomLists(remote.lists);
+        }
         setSheetsLastSyncTime(new Date().toISOString());
-      } else {
-        setSheetsSyncError(pushRes.message || 'Sync failed while writing to Google Sheet.');
       }
     } catch (err: any) {
       setSheetsSyncError(err.message || 'Sync error');
@@ -308,8 +299,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // 1. Initial Sync on App Load (Mobile or Laptop)
+  // 1. Initial Sync & Auto-Connect via ?syncUrl= URL parameter (For instant Mobile linking)
   useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlParam = params.get('syncUrl');
+      if (urlParam && urlParam.startsWith('https://script.google.com/')) {
+        connectSheets(urlParam);
+        // Clean the URL bar without reloading
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+        return;
+      }
+    } catch {}
+
     if (sheetsSyncUrl) {
       triggerSheetsSync();
     }
@@ -326,18 +329,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => window.removeEventListener('focus', handleFocus);
   }, [sheetsSyncUrl, isSheetsSyncing]);
 
-  // 3. Periodic Background Sync every 60 seconds
+  // 3. Periodic Background Pull every 6 seconds (Real-time simultaneous multi-device sync)
   useEffect(() => {
     if (!sheetsSyncUrl) return;
     const interval = setInterval(() => {
       if (!isSheetsSyncing && document.visibilityState === 'visible') {
         triggerSheetsSync();
       }
-    }, 60000);
+    }, 6000);
     return () => clearInterval(interval);
   }, [sheetsSyncUrl, isSheetsSyncing]);
 
-  // 4. Debounced Push to Google Sheet whenever tasks, sections, or customLists change locally
+  // 4. Fast Debounced Push to Google Sheet (800ms) whenever tasks change locally
   useEffect(() => {
     if (!sheetsSyncUrl || isSheetsSyncing) return;
     const timeout = setTimeout(() => {
@@ -346,7 +349,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         sections,
         lists: customLists,
       });
-    }, 3000);
+    }, 800);
     return () => clearTimeout(timeout);
   }, [tasks, sections, customLists, sheetsSyncUrl]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {

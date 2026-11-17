@@ -280,6 +280,46 @@ export const GoogleSheetsModal: React.FC = () => {
             </form>
 
             {/* Quick Multi-Device Explanation Banner */}
+            {sheetsSyncUrl && (
+              <div className="p-4 rounded-2xl bg-[#131316] border border-blue-500/30 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 text-white font-bold text-xs">
+                    <span className="text-base">📱</span>
+                    <span>Instant Mobile Connection (QR Code / 1-Click Link)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const shareUrl = `${window.location.origin}${window.location.pathname}?syncUrl=${encodeURIComponent(sheetsSyncUrl)}`;
+                      await navigator.clipboard.writeText(shareUrl);
+                      alert('Copied 1-Click Mobile Link! Send this via WhatsApp or open on your phone to connect automatically.');
+                    }}
+                    className="px-2.5 py-1 bg-blue-600/30 hover:bg-blue-600 text-blue-300 hover:text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer border border-blue-500/40 flex items-center gap-1"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Copy 1-Click Mobile Link</span>
+                  </button>
+                </div>
+                <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+                  <div className="shrink-0 bg-white p-1.5 rounded-xl shadow-md">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(
+                        `${window.location.origin}${window.location.pathname}?syncUrl=${encodeURIComponent(sheetsSyncUrl)}`
+                      )}`}
+                      alt="Scan with phone camera to connect"
+                      className="w-24 h-24"
+                    />
+                  </div>
+                  <div className="text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+                    <p className="font-semibold text-white">Mobile-la ore second-la connect panna:</p>
+                    <p>1. Unga phone camera-va indha QR code-la kaatunga 📸</p>
+                    <p>2. Varra link-ah open pannina, <strong>URL type panna thevaiye illama</strong> mobile-la automatic-ah sheet connect aagidum!</p>
+                    <p className="text-emerald-400 font-bold">⚡ Continuous 6-second live simultaneous sync active!</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="p-3.5 rounded-2xl bg-[#141418] border border-[#26262e] space-y-2">
               <div className="flex items-center gap-2 text-slate-300 font-semibold text-xs">
                 <Info className="w-4 h-4 text-blue-400 shrink-0" />
@@ -288,7 +328,7 @@ export const GoogleSheetsModal: React.FC = () => {
               <p className="text-[11px] text-slate-400 leading-relaxed pl-6">
                 1. Once you connect your Google Sheet here on your laptop, open this web app on your <strong>Mobile phone</strong>.
                 <br />
-                2. On Mobile, open this Google Sheets Sync window, paste the <strong>same Web App URL</strong>, and click Connect!
+                2. On Mobile, scan the QR code above or paste the <strong>same Web App URL</strong>, and click Connect!
                 <br />
                 3. That's it! Any tasks added or updated on mobile will appear on your laptop, and vice versa. 2-3 users can share the same sheet simultaneously!
               </p>

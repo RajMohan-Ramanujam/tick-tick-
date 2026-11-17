@@ -165,6 +165,8 @@ export const pullFromSheets = async (
         title: String(t.title || 'Untitled Task'),
         description: t.description ? String(t.description) : '',
         completed: Boolean(t.completed === true || t.completed === 'true' || t.completed === 'TRUE'),
+        deleted: Boolean(t.deleted === true || t.deleted === 'true' || t.deleted === 'TRUE'),
+        deletedAt: t.deletedAt ? String(t.deletedAt) : null,
         priority: (t.priority as any) || 'none',
         dueDate: t.dueDate ? String(t.dueDate) : null,
         dueTime: t.dueTime ? String(t.dueTime) : null,
@@ -265,12 +267,18 @@ export const pushToSheets = async (
  * Remote additions and updates merge without deleting local unsynced items
  */
 export const mergeTasks = (localTasks: Task[], remoteTasks: Task[]): Task[] => {
+  if (!remoteTasks || remoteTasks.length === 0) return localTasks;
+
   const map = new Map<string, Task>();
 
-  // Add local tasks first
-  localTasks.forEach((t) => map.set(t.id, t));
+  // If remote has tasks, ignore default starter demo tasks (w-1, w-2, etc.) from local
+  const isDefaultDemoTask = (id: string) => id.startsWith('w-');
+  const realLocalTasks = localTasks.filter((t) => !isDefaultDemoTask(t.id));
 
-  // Merge remote tasks (overwrite with remote or add new)
+  // Add real local tasks
+  realLocalTasks.forEach((t) => map.set(t.id, t));
+
+  // Overwrite with remote tasks (cloud source of truth)
   remoteTasks.forEach((remote) => {
     map.set(remote.id, remote);
   });
@@ -323,9 +331,9 @@ function doPost(e) {
     
     if (contents.tasks && Array.isArray(contents.tasks)) {
       setSheetData(ss, "Tasks", contents.tasks, [
-        "id", "title", "description", "completed", "priority", "dueDate", "dueTime", 
+        "id", "title", "description", "completed", "deleted", "priority", "dueDate", "dueTime", 
         "kanbanStatus", "eisenhowerQuadrant", "assignedTo", "assignedBy", 
-        "assignedDate", "assignedTime", "pinned", "subtasks", "tags", "listId", "createdAt"
+        "assignedDate", "assignedTime", "pinned", "subtasks", "tags", "listId", "createdAt", "deletedAt"
       ]);
     }
     
