@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Priority, KanbanStatus, EisenhowerQuadrant, RepeatRule } from '../../types';
-import { getTodayDate, formatFriendlyDate, normalizeDateStr } from '../../utils/storage';
+import { getTodayDate, formatFriendlyDate, normalizeDateStr, formatFriendlyTime } from '../../utils/storage';
 
 export const DetailPanel: React.FC = () => {
   const {
@@ -531,7 +531,7 @@ export const DetailPanel: React.FC = () => {
                   {task.assignedTime && (
                     <span className="flex items-center gap-1 font-mono text-slate-300">
                       <Clock className="w-3 h-3 text-cyan-400" />
-                      <span>{task.assignedTime}</span>
+                      <span>{formatFriendlyTime(task.assignedTime)}</span>
                     </span>
                   )}
                 </div>

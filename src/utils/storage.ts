@@ -145,6 +145,19 @@ export const formatFriendlyDate = (dateVal: any): string => {
   return normalized;
 };
 
+// Helper for simple human-friendly time display (e.g. "10:30 AM", "2:45 PM")
+export const formatFriendlyTime = (timeStr?: string | null): string => {
+  if (!timeStr) return '';
+  const trimmed = timeStr.trim();
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return trimmed;
+  let hours = parseInt(match[1], 10);
+  const minutes = match[2];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${ampm}`;
+};
+
 const DEFAULT_LISTS: CustomList[] = [
   { id: 'welcome', name: 'Welcome', color: '#F59E0B', icon: '👋', defaultView: 'kanban' },
   { id: 'work', name: 'Work Project', color: '#3B82F6', icon: 'Briefcase' },

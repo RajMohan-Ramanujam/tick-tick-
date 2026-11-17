@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getTodayDate, addDaysToDate } from '../../utils/storage';
+import { getTodayDate, addDaysToDate, normalizeDateStr } from '../../utils/storage';
 import { Priority, KanbanStatus } from '../../types';
 
 export const CreateTaskModal: React.FC = () => {
@@ -359,7 +359,7 @@ export const CreateTaskModal: React.FC = () => {
               </div>
               <input
                 type="date"
-                value={dueDate}
+                value={normalizeDateStr(dueDate) || ''}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="w-full text-xs px-3 py-2 rounded-xl bg-[#121214] text-white border border-[#2c2c34] focus:outline-none focus:border-blue-500 cursor-pointer"
               />

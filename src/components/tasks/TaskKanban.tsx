@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { KanbanStatus, Task } from '../../types';
-import { getTodayDate, addDaysToDate, normalizeDateStr } from '../../utils/storage';
+import { getTodayDate, addDaysToDate, normalizeDateStr, formatFriendlyDate, formatFriendlyTime } from '../../utils/storage';
 import { TaskContextMenu } from './TaskContextMenu';
 
 interface Section {
@@ -604,7 +604,10 @@ export const TaskKanban: React.FC = () => {
                                   <span className="text-slate-300">By: {task.assignedBy}</span>
                                 )}
                                 {task.assignedDate && (
-                                  <span className="text-slate-400 font-mono">({task.assignedDate}{task.assignedTime ? ` @ ${task.assignedTime}` : ''})</span>
+                                  <span className="text-slate-300 font-medium">
+                                    • {formatFriendlyDate(task.assignedDate)}
+                                    {task.assignedTime ? ` ${formatFriendlyTime(task.assignedTime)}` : ''}
+                                  </span>
                                 )}
                               </div>
                             )}

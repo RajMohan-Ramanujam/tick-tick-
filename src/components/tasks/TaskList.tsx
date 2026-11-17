@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Task, Priority } from '../../types';
-import { getTodayDate, addDaysToDate, formatFriendlyDate, normalizeDateStr } from '../../utils/storage';
+import { getTodayDate, addDaysToDate, formatFriendlyDate, normalizeDateStr, formatFriendlyTime } from '../../utils/storage';
 import { TaskContextMenu } from './TaskContextMenu';
 
 export const TaskList: React.FC = () => {
@@ -431,7 +431,7 @@ export const TaskList: React.FC = () => {
                                 }`}
                               >
                                 <Calendar className="w-3 h-3" />
-                                {formatFriendlyDate(task.dueDate)} {task.dueTime ? `@ ${task.dueTime}` : ''}
+                                {formatFriendlyDate(task.dueDate)} {task.dueTime ? `${formatFriendlyTime(task.dueTime)}` : ''}
                               </span>
                             )}
 
