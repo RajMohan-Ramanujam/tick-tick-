@@ -55,7 +55,11 @@ export const CreateTaskModal: React.FC = () => {
       setAssignedBy('');
       setDueDate(createTaskModalDefaults.dueDate || todayStr);
       setDueTime(createTaskModalDefaults.dueTime || '');
-      setPriority(createTaskModalDefaults.priority || 'none');
+      const initialPriority = createTaskModalDefaults.priority ||
+        (createTaskModalDefaults.eisenhowerQuadrant === 'q1' ? 'high' :
+         createTaskModalDefaults.eisenhowerQuadrant === 'q2' ? 'medium' :
+         createTaskModalDefaults.eisenhowerQuadrant === 'q3' ? 'low' : 'none');
+      setPriority(initialPriority);
       setSubtaskItems([]);
       setNewSubtaskInput('');
 

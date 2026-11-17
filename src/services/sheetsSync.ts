@@ -161,30 +161,44 @@ export const pullFromSheets = async (
 
     const data: SheetsSyncResponse = await response.json();
     if (data.status === 'success') {
-      const tasks: Task[] = (data.tasks || []).map((t: any) => ({
-        id: String(t.id),
-        title: String(t.title || 'Untitled Task'),
-        description: t.description ? String(t.description) : '',
-        completed: Boolean(t.completed === true || t.completed === 'true' || t.completed === 'TRUE'),
-        deleted: Boolean(t.deleted === true || t.deleted === 'true' || t.deleted === 'TRUE'),
-        deletedAt: t.deletedAt ? String(t.deletedAt) : null,
-        priority: (t.priority as any) || 'none',
-        dueDate: normalizeDateStr(t.dueDate),
-        dueTime: t.dueTime ? String(t.dueTime) : null,
-        assignedTo: t.assignedTo ? String(t.assignedTo) : undefined,
-        assignedBy: t.assignedBy ? String(t.assignedBy) : undefined,
-        assignedDate: normalizeDateStr(t.assignedDate) || normalizeDateStr(t.dueDate) || undefined,
-        assignedTime: t.assignedTime ? String(t.assignedTime) : undefined,
-        pinned: Boolean(t.pinned === true || t.pinned === 'true' || t.pinned === 'TRUE'),
-        subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
-        tags: Array.isArray(t.tags) ? t.tags : [],
-        kanbanStatus: t.kanbanStatus ? String(t.kanbanStatus) : 'todo',
-        eisenhowerQuadrant: t.eisenhowerQuadrant || 'q4',
-        listId: t.listId ? String(t.listId) : 'welcome',
-        estimatedPomodoros: Number(t.estimatedPomodoros) || 2,
-        completedPomodoros: Number(t.completedPomodoros) || 0,
-        createdAt: t.createdAt ? String(t.createdAt) : new Date().toISOString(),
-      }));
+      const tasks: Task[] = (data.tasks || []).map((t: any) => {
+        const priority = (t.priority as any) || 'none';
+        let eisenhowerQuadrant = t.eisenhowerQuadrant;
+        if (!eisenhowerQuadrant || (eisenhowerQuadrant === 'q4' && priority !== 'none')) {
+          eisenhowerQuadrant =
+            priority === 'high' ? 'q1' : priority === 'medium' ? 'q2' : priority === 'low' ? 'q3' : 'q4';
+        }
+
+        const dueDate = normalizeDateStr(t.dueDate) || normalizeDateStr(t.assignedDate);
+        const assignedDate = normalizeDateStr(t.assignedDate) || normalizeDateStr(t.dueDate) || undefined;
+        const dueTime = t.dueTime ? String(t.dueTime) : (t.assignedTime ? String(t.assignedTime) : null);
+        const assignedTime = t.assignedTime ? String(t.assignedTime) : (t.dueTime ? String(t.dueTime) : undefined);
+
+        return {
+          id: String(t.id),
+          title: String(t.title || 'Untitled Task'),
+          description: t.description ? String(t.description) : '',
+          completed: Boolean(t.completed === true || t.completed === 'true' || t.completed === 'TRUE'),
+          deleted: Boolean(t.deleted === true || t.deleted === 'true' || t.deleted === 'TRUE'),
+          deletedAt: t.deletedAt ? String(t.deletedAt) : null,
+          priority,
+          dueDate,
+          dueTime,
+          assignedTo: t.assignedTo ? String(t.assignedTo) : undefined,
+          assignedBy: t.assignedBy ? String(t.assignedBy) : undefined,
+          assignedDate,
+          assignedTime,
+          pinned: Boolean(t.pinned === true || t.pinned === 'true' || t.pinned === 'TRUE'),
+          subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
+          tags: Array.isArray(t.tags) ? t.tags : [],
+          kanbanStatus: t.kanbanStatus ? String(t.kanbanStatus) : 'todo',
+          eisenhowerQuadrant,
+          listId: t.listId ? String(t.listId) : 'welcome',
+          estimatedPomodoros: Number(t.estimatedPomodoros) || 2,
+          completedPomodoros: Number(t.completedPomodoros) || 0,
+          createdAt: t.createdAt ? String(t.createdAt) : new Date().toISOString(),
+        };
+      });
 
       const sections: KanbanSection[] = (data.sections || []).map((s: any) => ({
         id: String(s.id),
@@ -216,6 +230,9 @@ export const pushToSheets = async (
 ): Promise<{ success: boolean; message?: string; count?: number }> => {
   try {
     const trimmed = url.trim();
+    // Filter out deleted tasks so they are completely eliminated from Google Sheet
+    const activeTasks = (data.tasks || []).filter((t) => !t.deleted);
+
     // Use text/plain to avoid CORS preflight OPTIONS check on Google Apps Script
     const response = await fetch(trimmed, {
       method: 'POST',
@@ -224,7 +241,7 @@ export const pushToSheets = async (
       },
       body: JSON.stringify({
         action: 'syncAll',
-        tasks: data.tasks || [],
+        tasks: activeTasks,
         sections: data.sections || [],
         lists: data.lists || [],
         clientTimestamp: new Date().toISOString(),
@@ -243,14 +260,14 @@ export const pushToSheets = async (
     } catch {
       if (text.includes('"status":"success"') || text.includes('Synced successfully')) {
         setLastSyncTime(new Date().toISOString());
-        return { success: true, count: data.tasks?.length || 0 };
+        return { success: true, count: activeTasks.length };
       }
       return { success: false, message: 'Google Apps Script returned invalid response: ' + text.slice(0, 120) };
     }
 
     if (resJson.status === 'success') {
       setLastSyncTime(new Date().toISOString());
-      return { success: true, count: resJson.tasksCount ?? data.tasks?.length ?? 0 };
+      return { success: true, count: resJson.tasksCount ?? activeTasks.length };
     } else {
       return { success: false, message: resJson.message || 'Script reported an error while saving.' };
     }
@@ -265,26 +282,49 @@ export const pushToSheets = async (
 
 /**
  * Merge remote and local tasks safely
- * Remote additions and updates merge without deleting local unsynced items
+ * Google Sheets is the cloud source of truth.
+ * Tasks deleted in Google Sheet or on other devices are removed locally.
+ * Freshly created local tasks (< 8s old) are preserved while in-flight.
  */
-export const mergeTasks = (localTasks: Task[], remoteTasks: Task[]): Task[] => {
-  if (!remoteTasks || remoteTasks.length === 0) return localTasks;
+export const mergeTasks = (
+  localTasks: Task[],
+  remoteTasks: Task[],
+  recentlyDeletedIds: Set<string> = new Set()
+): Task[] => {
+  const resultTasks: Task[] = [];
+  const remoteIds = new Set<string>();
 
-  const map = new Map<string, Task>();
+  // 1. Process all remote tasks from Google Sheet
+  (remoteTasks || []).forEach((remote) => {
+    // If deleted locally recently, do not resurrect
+    if (recentlyDeletedIds.has(remote.id)) return;
+    if (remote.deleted) return;
 
-  // If remote has tasks, ignore default starter demo tasks (w-1, w-2, etc.) from local
-  const isDefaultDemoTask = (id: string) => id.startsWith('w-');
-  const realLocalTasks = localTasks.filter((t) => !isDefaultDemoTask(t.id));
-
-  // Add real local tasks
-  realLocalTasks.forEach((t) => map.set(t.id, t));
-
-  // Overwrite with remote tasks (cloud source of truth)
-  remoteTasks.forEach((remote) => {
-    map.set(remote.id, remote);
+    remoteIds.add(remote.id);
+    resultTasks.push(remote);
   });
 
-  return Array.from(map.values());
+  // 2. Check local tasks: keep only tasks that are brand new (< 8 seconds old)
+  // awaiting their first push to Google Sheet
+  const now = Date.now();
+  (localTasks || []).forEach((local) => {
+    if (recentlyDeletedIds.has(local.id)) return;
+    if (local.deleted) return;
+    if (remoteIds.has(local.id)) return; // Already present from remote
+
+    // Ignore default demo tasks (w-1, etc.) once cloud remote is connected
+    if (local.id.startsWith('w-')) return;
+
+    // Check if created recently (< 8000 ms) on this device
+    const createdMs = local.createdAt ? new Date(local.createdAt).getTime() : 0;
+    const isRecentlyCreated = !isNaN(createdMs) && now - createdMs < 8000;
+    if (isRecentlyCreated) {
+      resultTasks.push(local);
+    }
+    // Any other local task missing from remote was deleted in Google Sheet or on another device!
+  });
+
+  return resultTasks;
 };
 
 /**

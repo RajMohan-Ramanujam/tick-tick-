@@ -162,7 +162,7 @@ export const TaskKanban: React.FC = () => {
     if (smartView === 'inbox') {
       return task.listId === 'inbox';
     }
-    const taskDue = normalizeDateStr(task.dueDate);
+    const taskDue = normalizeDateStr(task.dueDate) || normalizeDateStr(task.assignedDate);
     if (smartView === 'today') {
       return taskDue === todayStr;
     }

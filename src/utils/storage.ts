@@ -98,6 +98,20 @@ export const normalizeDateStr = (val: any): string | null => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
       return trimmed;
     }
+    // Match date string with month name like "Wed Nov 18 2026 00:00:00 GMT+0530..." or "Nov 18 2026"
+    const monthNameMatch = trimmed.match(/(?:[A-Za-z]{3}\s+)?([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})/);
+    if (monthNameMatch) {
+      const monthMap: Record<string, string> = {
+        Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+        Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+      };
+      const mStr = monthMap[monthNameMatch[1]];
+      if (mStr) {
+        const dStr = monthNameMatch[2].padStart(2, '0');
+        const yStr = monthNameMatch[3];
+        return `${yStr}-${mStr}-${dStr}`;
+      }
+    }
     // Attempt parse any other string (GMT string, ISO string, etc.)
     const parsed = new Date(trimmed);
     if (!isNaN(parsed.getTime())) {
@@ -534,5 +548,27 @@ export const loadKanbanSections = (): KanbanSection[] => {
 export const saveKanbanSections = (sections: KanbanSection[]) => {
   try {
     localStorage.setItem(KANBAN_SECTIONS_STORAGE_KEY, JSON.stringify(sections));
+  } catch {}
+};
+
+export const DELETED_TASKS_STORAGE_KEY = 'ticktick_deleted_task_ids_v1';
+
+export const loadDeletedTaskIds = (): Set<string> => {
+  try {
+    const data = localStorage.getItem(DELETED_TASKS_STORAGE_KEY);
+    if (data) {
+      const arr = JSON.parse(data);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
+};
+
+export const saveDeletedTaskId = (id: string) => {
+  try {
+    const existing = loadDeletedTaskIds();
+    existing.add(id);
+    const arr = Array.from(existing).slice(-200);
+    localStorage.setItem(DELETED_TASKS_STORAGE_KEY, JSON.stringify(arr));
   } catch {}
 };

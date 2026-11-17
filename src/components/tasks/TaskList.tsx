@@ -84,7 +84,7 @@ export const TaskList: React.FC = () => {
     if (smartView === 'inbox') {
       return task.listId === 'inbox' || !task.listId;
     }
-    const taskDue = normalizeDateStr(task.dueDate);
+    const taskDue = normalizeDateStr(task.dueDate) || normalizeDateStr(task.assignedDate);
     if (smartView === 'today') {
       return taskDue === today;
     }
@@ -424,14 +424,14 @@ export const TaskList: React.FC = () => {
 
                           {/* Sub-info Row */}
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                            {task.dueDate && (
+                            {(task.dueDate || task.assignedDate) && (
                               <span
                                 className={`flex items-center gap-1 ${
-                                  normalizeDateStr(task.dueDate) === today ? 'text-emerald-500 font-semibold' : ''
+                                  (normalizeDateStr(task.dueDate) || normalizeDateStr(task.assignedDate)) === today ? 'text-emerald-500 font-semibold' : ''
                                 }`}
                               >
                                 <Calendar className="w-3 h-3" />
-                                {formatFriendlyDate(task.dueDate)} {task.dueTime ? `${formatFriendlyTime(task.dueTime)}` : ''}
+                                {formatFriendlyDate(task.dueDate || task.assignedDate)} {(task.dueTime || task.assignedTime) ? `${formatFriendlyTime(task.dueTime || task.assignedTime)}` : ''}
                               </span>
                             )}
 

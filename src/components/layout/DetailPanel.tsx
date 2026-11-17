@@ -85,6 +85,8 @@ export const DetailPanel: React.FC = () => {
       assignedBy: formAssignedBy.trim() || undefined,
       assignedDate: formAssignedDate || undefined,
       assignedTime: formAssignedTime || undefined,
+      dueDate: formAssignedDate || task.dueDate || null,
+      dueTime: formAssignedTime || task.dueTime || null,
     });
     setIsEditingAssignment(false);
   };

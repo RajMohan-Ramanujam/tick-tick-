@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { EisenhowerQuadrant, Task } from '../../types';
-import { getTodayDate } from '../../utils/storage';
+import { getTodayDate, normalizeDateStr, formatFriendlyDate } from '../../utils/storage';
 
 export const EisenhowerMatrix: React.FC = () => {
   const {
@@ -102,6 +102,20 @@ export const EisenhowerMatrix: React.FC = () => {
     setCollapsedGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   };
 
+  const getTaskQuadrant = (t: Task): EisenhowerQuadrant => {
+    // If priority is high, always map to q1 (Urgent & Important)
+    if (t.priority === 'high') return 'q1';
+    // If priority is medium, always map to q2 (Not Urgent & Important)
+    if (t.priority === 'medium') return 'q2';
+    // If priority is low, always map to q3 (Urgent & Unimportant)
+    if (t.priority === 'low') return 'q3';
+    // If quadrant is explicitly specified and valid:
+    if (t.eisenhowerQuadrant && ['q1', 'q2', 'q3', 'q4'].includes(t.eisenhowerQuadrant)) {
+      return t.eisenhowerQuadrant;
+    }
+    return 'q4';
+  };
+
   const handleQuickAdd = (e: React.FormEvent, qId: EisenhowerQuadrant) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
@@ -110,7 +124,9 @@ export const EisenhowerMatrix: React.FC = () => {
       title: quickTitle.trim(),
       description: '',
       priority: qId === 'q1' ? 'high' : qId === 'q2' ? 'medium' : qId === 'q3' ? 'low' : 'none',
+      eisenhowerQuadrant: qId,
       dueDate: todayStr,
+      assignedDate: todayStr,
       listId: activeListId || 'welcome',
       tags: [],
     });
@@ -139,16 +155,21 @@ export const EisenhowerMatrix: React.FC = () => {
       <div className="flex-1 p-3 overflow-hidden">
         <div className="grid grid-cols-2 grid-rows-2 gap-3 h-full">
           {quadrants.map((q) => {
-            const qTasks = activeTasks.filter((t) => {
-              if (t.eisenhowerQuadrant === q.id) return true;
-              if (q.id === 'q4' && !t.eisenhowerQuadrant) return true;
-              return false;
-            });
+            const qTasks = activeTasks.filter((t) => getTaskQuadrant(t) === q.id);
 
             // Group tasks inside quadrant: Today, Scheduled, and No Date
-            const todayTasks = qTasks.filter((t) => t.dueDate === todayStr);
-            const scheduledTasks = qTasks.filter((t) => t.dueDate && t.dueDate !== todayStr);
-            const noDateTasks = qTasks.filter((t) => !t.dueDate);
+            const todayTasks = qTasks.filter((t) => {
+              const d = normalizeDateStr(t.dueDate) || normalizeDateStr(t.assignedDate);
+              return d === todayStr;
+            });
+            const scheduledTasks = qTasks.filter((t) => {
+              const d = normalizeDateStr(t.dueDate) || normalizeDateStr(t.assignedDate);
+              return d && d !== todayStr;
+            });
+            const noDateTasks = qTasks.filter((t) => {
+              const d = normalizeDateStr(t.dueDate) || normalizeDateStr(t.assignedDate);
+              return !d;
+            });
 
             return (
               <div
@@ -406,10 +427,10 @@ const TaskMatrixRow: React.FC<{
 
       {/* Right List Badge, Date Badge & Note Indicator */}
       <div className="flex items-center gap-2 shrink-0 text-[11px] text-slate-400 font-medium">
-        {task.dueDate && (
+        {(task.dueDate || task.assignedDate) && (
           <span className="flex items-center gap-1 text-[10px] text-slate-300 bg-[#161618] px-2 py-0.5 rounded-md border border-[#2e2e34]">
             <CalendarIcon className="w-3 h-3 text-blue-400" />
-            <span>{task.dueDate}</span>
+            <span>{formatFriendlyDate(task.dueDate || task.assignedDate)}</span>
           </span>
         )}
 

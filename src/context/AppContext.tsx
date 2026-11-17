@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import confetti from 'canvas-confetti';
 import type {
   Task,
@@ -37,6 +37,8 @@ import {
   saveActiveListId,
   loadKanbanSections,
   saveKanbanSections,
+  loadDeletedTaskIds,
+  saveDeletedTaskId,
 } from '../utils/storage';
 import { soundEngine } from '../utils/audio';
 import {
@@ -224,6 +226,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [sheetsSyncError, setSheetsSyncError] = useState<string | null>(null);
   const [isSheetsModalOpen, setIsSheetsModalOpen] = useState<boolean>(false);
 
+  // Track recently deleted IDs to prevent any in-flight or delayed syncs from resurrecting deleted tasks
+  const recentlyDeletedRef = useRef<Set<string>>(loadDeletedTaskIds());
+
   const connectSheets = async (url: string): Promise<boolean> => {
     setIsSheetsSyncing(true);
     setSheetsSyncError(null);
@@ -239,26 +244,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSheetsSyncUrlState(url);
 
       const remote = await pullFromSheets(url);
-      const mergedTasks = remote && remote.tasks.length > 0 ? mergeTasks(tasks, remote.tasks) : tasks;
-      const mergedSections = remote && remote.sections && remote.sections.length > 0 ? remote.sections : sections;
-      const mergedLists = remote && remote.lists && remote.lists.length > 0 ? remote.lists : customLists;
+      let targetTasks: Task[] = [];
+      let targetSections = sections;
+      let targetLists = customLists;
 
-      setTasks(mergedTasks);
-      setSections(mergedSections);
-      setCustomLists(mergedLists);
-
-      // Explicitly push and await to ensure tasks are written to the sheet immediately
-      const pushRes = await pushToSheets(url, {
-        tasks: mergedTasks,
-        sections: mergedSections,
-        lists: mergedLists,
-      });
-
-      if (!pushRes.success) {
-        setSheetsSyncError(pushRes.message || 'Could not write tasks to sheet. Check Apps Script permissions.');
-        setIsSheetsSyncing(false);
-        return false;
+      if (remote && remote.tasks && remote.tasks.length > 0) {
+        // Sheet already has active tasks: adopt sheet data as source of truth
+        targetTasks = remote.tasks.filter((t) => !recentlyDeletedRef.current.has(t.id));
+        if (remote.sections && remote.sections.length > 0) targetSections = remote.sections;
+        if (remote.lists && remote.lists.length > 0) targetLists = remote.lists;
+      } else {
+        // Brand new empty sheet: upload current non-deleted local tasks
+        targetTasks = tasks.filter((t) => !recentlyDeletedRef.current.has(t.id) && !t.deleted);
+        await pushToSheets(url, {
+          tasks: targetTasks,
+          sections: targetSections,
+          lists: targetLists,
+        });
       }
+
+      setTasks(targetTasks);
+      setSections(targetSections);
+      setCustomLists(targetLists);
 
       setSheetsLastSyncTime(new Date().toISOString());
       setIsSheetsSyncing(false);
@@ -283,7 +290,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       const remote = await pullFromSheets(sheetsSyncUrl);
       if (remote) {
-        setTasks((prev) => mergeTasks(prev, remote.tasks));
+        setTasks((prev) => mergeTasks(prev, remote.tasks, recentlyDeletedRef.current));
         if (remote.sections && remote.sections.length > 0) {
           setSections(remote.sections);
         }
@@ -320,23 +327,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // 2. Auto-Sync when user switches back to this tab/window (e.g. from Mobile to Laptop)
   useEffect(() => {
-    const handleFocus = () => {
-      if (sheetsSyncUrl && !isSheetsSyncing) {
+    const handleSyncTrigger = () => {
+      if (sheetsSyncUrl && !isSheetsSyncing && document.visibilityState === 'visible') {
         triggerSheetsSync();
       }
     };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
+    window.addEventListener('focus', handleSyncTrigger);
+    document.addEventListener('visibilitychange', handleSyncTrigger);
+    return () => {
+      window.removeEventListener('focus', handleSyncTrigger);
+      document.removeEventListener('visibilitychange', handleSyncTrigger);
+    };
   }, [sheetsSyncUrl, isSheetsSyncing]);
 
-  // 3. Periodic Background Pull every 6 seconds (Real-time simultaneous multi-device sync)
+  // 3. Periodic Background Pull every 4 seconds (Real-time simultaneous multi-device sync)
   useEffect(() => {
     if (!sheetsSyncUrl) return;
     const interval = setInterval(() => {
       if (!isSheetsSyncing && document.visibilityState === 'visible') {
         triggerSheetsSync();
       }
-    }, 6000);
+    }, 4000);
     return () => clearInterval(interval);
   }, [sheetsSyncUrl, isSheetsSyncing]);
 
@@ -621,9 +632,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const deleteTask = (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, deleted: true, deletedAt: new Date().toISOString() } : t))
-    );
+    saveDeletedTaskId(id);
+    recentlyDeletedRef.current.add(id);
+    setTasks((prev) => {
+      const remaining = prev.filter((t) => t.id !== id);
+      if (sheetsSyncUrl) {
+        pushToSheets(sheetsSyncUrl, {
+          tasks: remaining,
+          sections,
+          lists: customLists,
+        });
+      }
+      return remaining;
+    });
     if (selectedTaskId === id) setSelectedTaskId(null);
   };
 
@@ -634,7 +655,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const permanentlyDeleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    saveDeletedTaskId(id);
+    recentlyDeletedRef.current.add(id);
+    setTasks((prev) => {
+      const remaining = prev.filter((t) => t.id !== id);
+      if (sheetsSyncUrl) {
+        pushToSheets(sheetsSyncUrl, {
+          tasks: remaining,
+          sections,
+          lists: customLists,
+        });
+      }
+      return remaining;
+    });
     if (selectedTaskId === id) setSelectedTaskId(null);
   };
 

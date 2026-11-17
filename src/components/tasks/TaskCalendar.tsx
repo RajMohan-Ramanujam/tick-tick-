@@ -13,7 +13,7 @@ import {
   Pin,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getTodayDate, addDaysToDate } from '../../utils/storage';
+import { getTodayDate, addDaysToDate, normalizeDateStr, formatFriendlyTime, formatFriendlyDate } from '../../utils/storage';
 import { Priority, Task } from '../../types';
 
 export const TaskCalendar: React.FC = () => {
@@ -161,7 +161,9 @@ export const TaskCalendar: React.FC = () => {
         if (filterStatus === 'completed' && !t.completed) return false;
         if (smartView === 'completed' && !t.completed) return false;
 
-        return t.dueDate === dateIso || (!t.dueDate && t.assignedDate === dateIso);
+        const due = normalizeDateStr(t.dueDate);
+        const assigned = normalizeDateStr(t.assignedDate);
+        return due === dateIso || assigned === dateIso;
       })
       .sort((a, b) => {
         if (a.completed !== b.completed) {
@@ -503,7 +505,7 @@ export const TaskCalendar: React.FC = () => {
                             {(t.dueTime || t.assignedTime) && (
                               <span className="text-[9px] font-mono text-slate-400 flex items-center gap-0.5 bg-black/30 px-1 rounded">
                                 <Clock className="w-2.5 h-2.5" />
-                                {t.dueTime || t.assignedTime}
+                                {formatFriendlyTime(t.dueTime || t.assignedTime)}
                               </span>
                             )}
                             {t.assignedTo && (
@@ -674,8 +676,12 @@ export const TaskCalendar: React.FC = () => {
               {['08:00 AM', '10:00 AM', '12:00 PM', '02:00 PM', '04:00 PM', '06:00 PM', '08:00 PM'].map((timeSlot) => {
                 const dayIso = getLocalDateIso(currentDate);
                 const dayTasks = getTasksForDate(dayIso);
+                const matchTime = (val?: string | null) => {
+                  if (!val) return false;
+                  return val === timeSlot || formatFriendlyTime(val) === timeSlot;
+                };
                 const matchingTasks = dayTasks.filter(
-                  (t) => t.dueTime === timeSlot || t.assignedTime === timeSlot
+                  (t) => matchTime(t.dueTime) || matchTime(t.assignedTime)
                 );
 
                 return (
