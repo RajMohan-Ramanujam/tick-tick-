@@ -1,4 +1,5 @@
 import { Task, KanbanSection, CustomList } from '../types';
+import { normalizeDateStr } from '../utils/storage';
 
 export const SHEETS_STORAGE_KEYS = {
   URL: 'ticktick_sheets_sync_url',
@@ -168,11 +169,11 @@ export const pullFromSheets = async (
         deleted: Boolean(t.deleted === true || t.deleted === 'true' || t.deleted === 'TRUE'),
         deletedAt: t.deletedAt ? String(t.deletedAt) : null,
         priority: (t.priority as any) || 'none',
-        dueDate: t.dueDate ? String(t.dueDate) : null,
+        dueDate: normalizeDateStr(t.dueDate),
         dueTime: t.dueTime ? String(t.dueTime) : null,
         assignedTo: t.assignedTo ? String(t.assignedTo) : undefined,
         assignedBy: t.assignedBy ? String(t.assignedBy) : undefined,
-        assignedDate: t.assignedDate ? String(t.assignedDate) : undefined,
+        assignedDate: normalizeDateStr(t.assignedDate) || normalizeDateStr(t.dueDate) || undefined,
         assignedTime: t.assignedTime ? String(t.assignedTime) : undefined,
         pinned: Boolean(t.pinned === true || t.pinned === 'true' || t.pinned === 'TRUE'),
         subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
@@ -379,7 +380,7 @@ function getSheetData(ss, sheetName) {
     const item = {};
     headers.forEach(function(header, index) {
       let val = row[index];
-      if (header === "completed" || header === "pinned") {
+      if (header === "completed" || header === "pinned" || header === "deleted") {
         item[header] = (val === true || val === "TRUE" || val === 1 || val === "true");
       } else if (header === "subtasks" || header === "tags") {
         try {
@@ -387,6 +388,11 @@ function getSheetData(ss, sheetName) {
         } catch (e) {
           item[header] = [];
         }
+      } else if (Object.prototype.toString.call(val) === '[object Date]' || val instanceof Date) {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        item[header] = y + '-' + m + '-' + d;
       } else {
         item[header] = val !== undefined && val !== null ? String(val) : "";
       }

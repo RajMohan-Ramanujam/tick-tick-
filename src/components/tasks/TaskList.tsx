@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Task, Priority } from '../../types';
-import { getTodayDate, addDaysToDate } from '../../utils/storage';
+import { getTodayDate, addDaysToDate, formatFriendlyDate, normalizeDateStr } from '../../utils/storage';
 import { TaskContextMenu } from './TaskContextMenu';
 
 export const TaskList: React.FC = () => {
@@ -84,19 +84,20 @@ export const TaskList: React.FC = () => {
     if (smartView === 'inbox') {
       return task.listId === 'inbox' || !task.listId;
     }
+    const taskDue = normalizeDateStr(task.dueDate);
     if (smartView === 'today') {
-      return task.dueDate === today;
+      return taskDue === today;
     }
     if (smartView === 'yesterday') {
       const yesterday = addDaysToDate(today, -1);
-      return task.dueDate === yesterday;
+      return taskDue === yesterday;
     }
     if (smartView === 'old_tasks') {
       const yesterday = addDaysToDate(today, -1);
-      return task.dueDate ? task.dueDate < yesterday : (task.createdAt && task.createdAt.split('T')[0] < yesterday);
+      return taskDue ? taskDue < yesterday : (task.createdAt && task.createdAt.split('T')[0] < yesterday);
     }
     if (smartView === 'next7') {
-      return task.dueDate && task.dueDate >= today && task.dueDate <= next7;
+      return taskDue && taskDue >= today && taskDue <= next7;
     }
     if (smartView === 'high_priority') {
       return task.priority === 'high';
@@ -426,11 +427,11 @@ export const TaskList: React.FC = () => {
                             {task.dueDate && (
                               <span
                                 className={`flex items-center gap-1 ${
-                                  task.dueDate === today ? 'text-emerald-500 font-semibold' : ''
+                                  normalizeDateStr(task.dueDate) === today ? 'text-emerald-500 font-semibold' : ''
                                 }`}
                               >
                                 <Calendar className="w-3 h-3" />
-                                {task.dueDate} {task.dueTime ? `@ ${task.dueTime}` : ''}
+                                {formatFriendlyDate(task.dueDate)} {task.dueTime ? `@ ${task.dueTime}` : ''}
                               </span>
                             )}
 

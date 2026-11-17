@@ -88,6 +88,63 @@ export const addDaysToDate = (dateStr: string, days: number): string => {
   return `${year}-${month}-${day}`;
 };
 
+// Helper to normalize any date input (Date object, ISO string, GMT string) into clean YYYY-MM-DD
+export const normalizeDateStr = (val: any): string | null => {
+  if (!val) return null;
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    // Already in standard YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      return trimmed;
+    }
+    // Attempt parse any other string (GMT string, ISO string, etc.)
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) {
+      const year = parsed.getFullYear();
+      const month = String(parsed.getMonth() + 1).padStart(2, '0');
+      const day = String(parsed.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  } else if (val instanceof Date && !isNaN(val.getTime())) {
+    const year = val.getFullYear();
+    const month = String(val.getMonth() + 1).padStart(2, '0');
+    const day = String(val.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return null;
+};
+
+// Helper for human-friendly date display (e.g. "Today", "Tomorrow", "Wed, Nov 18")
+export const formatFriendlyDate = (dateVal: any): string => {
+  const normalized = normalizeDateStr(dateVal);
+  if (!normalized) return 'Set Due Date';
+
+  const todayStr = getTodayDate();
+  const tomorrowStr = addDaysToDate(todayStr, 1);
+  const yesterdayStr = addDaysToDate(todayStr, -1);
+
+  if (normalized === todayStr) return 'Today';
+  if (normalized === tomorrowStr) return 'Tomorrow';
+  if (normalized === yesterdayStr) return 'Yesterday';
+
+  const parts = normalized.split('-').map(Number);
+  if (parts.length === 3) {
+    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+    const month = dateObj.toLocaleDateString('en-US', { month: 'short' });
+    const day = dateObj.getDate();
+    const currentYear = new Date().getFullYear();
+
+    if (parts[0] === currentYear) {
+      return `${weekday}, ${month} ${day}`;
+    }
+    return `${month} ${day}, ${parts[0]}`;
+  }
+
+  return normalized;
+};
+
 const DEFAULT_LISTS: CustomList[] = [
   { id: 'welcome', name: 'Welcome', color: '#F59E0B', icon: '👋', defaultView: 'kanban' },
   { id: 'work', name: 'Work Project', color: '#3B82F6', icon: 'Briefcase' },

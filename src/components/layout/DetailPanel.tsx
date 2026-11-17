@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { Priority, KanbanStatus, EisenhowerQuadrant, RepeatRule } from '../../types';
-import { getTodayDate } from '../../utils/storage';
+import { getTodayDate, formatFriendlyDate, normalizeDateStr } from '../../utils/storage';
 
 export const DetailPanel: React.FC = () => {
   const {
@@ -195,10 +195,10 @@ export const DetailPanel: React.FC = () => {
           <div className="relative flex items-center">
             <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#161618] hover:bg-[#26262a] text-slate-300 text-xs font-semibold border border-[#303036] transition-colors cursor-pointer">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <span>{task.dueDate ? `Due ${task.dueDate}` : 'Set Due Date'}</span>
+              <span>{task.dueDate ? `Due ${formatFriendlyDate(task.dueDate)}` : 'Set Due Date'}</span>
               <input
                 type="date"
-                value={task.dueDate || ''}
+                value={normalizeDateStr(task.dueDate) || ''}
                 onChange={(e) => {
                   const newDate = e.target.value || null;
                   updateTask(task.id, {
@@ -216,7 +216,7 @@ export const DetailPanel: React.FC = () => {
                   e.stopPropagation();
                   updateTask(task.id, { dueDate: null, assignedDate: undefined });
                 }}
-                className="ml-1 p-1 text-slate-500 hover:text-slate-300 rounded"
+                className="ml-1 p-1 text-slate-500 hover:text-slate-300 rounded cursor-pointer"
                 title="Clear due date"
               >
                 <X className="w-3 h-3" />
@@ -526,7 +526,7 @@ export const DetailPanel: React.FC = () => {
                 <div className="flex items-center justify-between pt-1 border-t border-[#222228] text-[11px] text-slate-400">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-amber-400" />
-                    <span>{task.assignedDate || 'No date'}</span>
+                    <span>{task.assignedDate ? formatFriendlyDate(task.assignedDate) : 'No date'}</span>
                   </span>
                   {task.assignedTime && (
                     <span className="flex items-center gap-1 font-mono text-slate-300">
@@ -588,7 +588,7 @@ export const DetailPanel: React.FC = () => {
                   </div>
                   <input
                     type="date"
-                    value={formAssignedDate}
+                    value={normalizeDateStr(formAssignedDate) || ''}
                     onChange={(e) => setFormAssignedDate(e.target.value)}
                     className="w-full text-xs px-2 py-1 rounded-xl bg-[#18181c] text-white border border-[#2e2e36] focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />

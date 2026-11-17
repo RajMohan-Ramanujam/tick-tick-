@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import type { KanbanStatus, Task } from '../../types';
-import { getTodayDate, addDaysToDate } from '../../utils/storage';
+import { getTodayDate, addDaysToDate, normalizeDateStr } from '../../utils/storage';
 import { TaskContextMenu } from './TaskContextMenu';
 
 interface Section {
@@ -162,17 +162,18 @@ export const TaskKanban: React.FC = () => {
     if (smartView === 'inbox') {
       return task.listId === 'inbox';
     }
+    const taskDue = normalizeDateStr(task.dueDate);
     if (smartView === 'today') {
-      return task.dueDate === todayStr;
+      return taskDue === todayStr;
     }
     if (smartView === 'yesterday') {
-      return task.dueDate === yesterdayStr;
+      return taskDue === yesterdayStr;
     }
     if (smartView === 'old_tasks') {
-      return task.dueDate ? task.dueDate < yesterdayStr : (task.createdAt && task.createdAt.split('T')[0] < yesterdayStr);
+      return taskDue ? taskDue < yesterdayStr : (task.createdAt && task.createdAt.split('T')[0] < yesterdayStr);
     }
     if (smartView === 'next7') {
-      return task.dueDate && task.dueDate >= todayStr && task.dueDate <= next7Str;
+      return taskDue && taskDue >= todayStr && taskDue <= next7Str;
     }
     if (smartView === 'high_priority') {
       return task.priority === 'high';
